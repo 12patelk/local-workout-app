@@ -1032,4 +1032,163 @@ accessories = workout_data["accessories"]
 # Overview Card
 st.markdown("---")
 st.markdown("### 📋 Today's 30-Min Routine Overview")
-overview_cols = st.columns(len
+overview_cols = st.columns(len(compounds) + len(accessories))
+all_raw_lifts = [(c, True) for c in compounds] + [(a, False) for a in accessories]
+
+for idx, (lift_obj, is_comp) in enumerate(all_raw_lifts):
+  with overview_cols[idx]:
+    st.caption("Compound" if is_comp else "Accessory")
+    st.markdown(f"**{lift_obj['name']}**")
+    st.caption(f"{lift_obj['sets']} Sets | {lift_obj['rep_range']} Reps")
+
+st.markdown("---")
+
+# Exercise Focus UI (Tabs navigation to isolate 1 exercise view at a time)
+exercise_tab_names = [
+    f"Ex {i+1}: {l['name']}" for i, (l, _) in enumerate(all_raw_lifts)
+]
+tabs = st.tabs(exercise_tab_names)
+
+session_inputs = {}
+
+for idx, ((lift_obj, is_comp), tab) in enumerate(zip(all_raw_lifts, tabs)):
+  with tab:
+    default_name = lift_obj["name"]
+    alternatives = EXERCISE_ALTERNATIVES.get(default_name, [])
+    options_list = [default_name] + alternatives
+
+    st.markdown(f"### Exercise {idx+1}")
+    selected_lift_name = st.selectbox(
+        "Equipment Swapper (If Machine Occupied):",
+        options_list,
+        key=f"swap_ex_{idx}",
+    )
+
+    target_rest_str = (
+        rest_config["compound_rest"]
+        if is_comp
+        else rest_config["isolation_rest"]
+    )
+    timer_seconds = (
+        rest_config["compound_seconds"]
+        if is_comp
+        else rest_config["isolation_seconds"]
+    )
+
+    st.caption(
+        f"Target: **{lift_obj['sets']} Working Sets** | Rep Range:"
+        f" **{lift_obj['rep_range']}** | Target Rest: **{target_rest_str}**"
+    )
+
+    sets_data = []
+
+    if is_comp:
+      st.info("🔥 **Warm-Up Set:** Light weight (~50-60% working weight)")
+      w_col1, w_col2 = st.columns(2)
+      with w_col1:
+        wu_w = st.number_input(
+            "Warmup Weight (lbs)",
+            min_value=0.0,
+            step=5.0,
+            key=f"ex_{idx}_wu_w",
+        )
+      with w_col2:
+        wu_r = st.number_input(
+            "Warmup Reps",
+            min_value=0,
+            max_value=50,
+            step=1,
+            key=f"ex_{idx}_wu_r",
+        )
+      sets_data.append({"set": "Warmup", "weight": wu_w, "reps": wu_r})
+
+    st.markdown("#### **Working Sets**")
+    working_weight = st.number_input(
+        f"Working Weight (lbs) for all {lift_obj['sets']} sets:",
+        min_value=0.0,
+        step=2.5,
+        key=f"ex_{idx}_working_weight",
+    )
+
+    rep_cols = st.columns(lift_obj["sets"])
+    for s in range(1, lift_obj["sets"] + 1):
+      with rep_cols[s - 1]:
+        r = st.number_input(
+            f"Set {s} Reps",
+            min_value=0,
+            max_value=100,
+            step=1,
+            key=f"ex_{idx}_s{s}_r",
+        )
+        sets_data.append({"set": s, "weight": working_weight, "reps": r})
+
+    # Rest Timer
+    timer_placeholder = st.empty()
+    if st.button(
+        f"⏱️ Start {target_rest_str} Rest Timer", key=f"timer_btn_{idx}"
+    ):
+      for remaining in range(timer_seconds, 0, -1):
+        m, s = divmod(remaining, 60)
+        timer_placeholder.warning(
+            f"⏳ Rest Active: **{m:02d}:{s:02d}** remaining..."
+        )
+        time.sleep(1)
+      timer_placeholder.success("🔔 Rest up! Start your next set.")
+
+    session_inputs[selected_lift_name] = sets_data
+
+st.markdown("---")
+if st.button("💾 Save 30-Min Workout", type="primary"):
+  today_str = datetime.date.today().strftime("%Y-%m-%d")
+  if today_str not in logs:
+    logs[today_str] = {}
+  logs[today_str][
+      f"{split_choice} [{option_choice}] ({phase_choice})"
+  ] = session_inputs
+  save_logs(logs, current_sha)
+  st.success("Session saved & auto-synced to GitHub!")
+
+# History Section
+st.markdown("---")
+st.subheader("📈 Exercise History")
+if logs:
+  all_exercise_names = set()
+  for cat in WORKOUT_TEMPLATES.values():
+    for env in cat.values():
+      for opt in env.values():
+        for l in opt["compounds"] + opt["accessories"]:
+          all_exercise_names.add(l["name"])
+          for alt in EXERCISE_ALTERNATIVES.get(l["name"], []):
+            all_exercise_names.add(alt)
+
+  selected_lift = st.selectbox(
+      "Select exercise to view past records:", sorted(list(all_exercise_names))
+  )
+
+  history_data = []
+  for date, splits in logs.items():
+    for split_name, exercises in splits.items():
+      if selected_lift in exercises:
+        ex_entry = exercises[selected_lift]
+        if isinstance(ex_entry, list):
+          sets_summary = ", ".join([
+              f"WU: {s['weight']}×{s['reps']}"
+              if s["set"] == "Warmup"
+              else f"S{s['set']}: {s['weight']}lbs×{s['reps']}"
+              for s in ex_entry
+          ])
+        else:
+          sets_summary = f"{ex_entry.get('weight', 0)}lbs × ({ex_entry.get('reps', '')})"
+
+        history_data.append({
+            "Date": date,
+            "Session": split_name,
+            "Per-Set Performance": sets_summary,
+        })
+
+  if history_data:
+    st.table(history_data)
+  else:
+    st.info("No recorded history for this exercise yet.")
+else:
+  st.info("Log your first workout to view historical progression.")
