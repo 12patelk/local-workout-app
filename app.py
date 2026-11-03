@@ -142,7 +142,12 @@ REST_RULES = {
     },
 }
 
-# Balanced 16-Rotation Upper/Lower Split (4 Split Days x 4 Options Each)
+# Rebalanced 16-Rotation Upper/Lower Split
+# Upper A -> Holds 1 Bicep/Forearm Isolation per workout (0 Tricep)
+# Upper B -> Holds 1 Tricep Isolation per workout (0 Bicep)
+# Lower A & B -> Lower Body / Core (0 Arm Isolation)
+# Result: Exactly 1 Bicep/Forearm isolation & 1 Tricep isolation across the entire 4-day weekly cycle.
+
 WORKOUT_TEMPLATES = {
     "Upper A (Chest / Back / Shoulders / Arms)": {
         "Gym": {
@@ -158,7 +163,7 @@ WORKOUT_TEMPLATES = {
                         "rep_range": "8-12",
                     },
                     {
-                        "name": "Cable Tricep Pushdown",
+                        "name": "Cable Bicep Curl",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
@@ -180,7 +185,7 @@ WORKOUT_TEMPLATES = {
                         "rep_range": "8-12",
                     },
                     {
-                        "name": "Cable Bicep Curl",
+                        "name": "Incline Dumbbell Bicep Curl",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
@@ -227,12 +232,12 @@ WORKOUT_TEMPLATES = {
                 ],
                 "accessories": [
                     {
-                        "name": "Overhead Cable Tricep Extension",
+                        "name": "Cable Chest Fly",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
                     {
-                        "name": "Incline Dumbbell Bicep Curl",
+                        "name": "Cable Rope Hammer Curl",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
@@ -256,7 +261,7 @@ WORKOUT_TEMPLATES = {
                         "rep_range": "8-12",
                     },
                     {
-                        "name": "Band Tricep Pushdown",
+                        "name": "Resistance Band Bicep Curl",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
@@ -282,7 +287,7 @@ WORKOUT_TEMPLATES = {
                         "rep_range": "8-12",
                     },
                     {
-                        "name": "Resistance Band Bicep Curl",
+                        "name": "Resistance Band Hammer Curl",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
@@ -304,7 +309,7 @@ WORKOUT_TEMPLATES = {
                         "rep_range": "8-12",
                     },
                     {
-                        "name": "Resistance Band Hammer Curl",
+                        "name": "Resistance Band Bicep Curl",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
@@ -325,12 +330,12 @@ WORKOUT_TEMPLATES = {
                 ],
                 "accessories": [
                     {
-                        "name": "Band Overhead Tricep Extension",
+                        "name": "Resistance Band Chest Fly",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
                     {
-                        "name": "Resistance Band Bicep Curl",
+                        "name": "Resistance Band Hammer Curl",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
@@ -568,7 +573,7 @@ WORKOUT_TEMPLATES = {
                         "rep_range": "8-12",
                     },
                     {
-                        "name": "Cable Rope Hammer Curl",
+                        "name": "Overhead Cable Tricep Extension",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
@@ -594,7 +599,7 @@ WORKOUT_TEMPLATES = {
                         "rep_range": "8-12",
                     },
                     {
-                        "name": "Incline Dumbbell Bicep Curl",
+                        "name": "Cable Tricep Pushdown",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
@@ -644,7 +649,7 @@ WORKOUT_TEMPLATES = {
                         "rep_range": "8-12",
                     },
                     {
-                        "name": "Resistance Band Hammer Curl",
+                        "name": "Band Tricep Pushdown",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
@@ -691,12 +696,12 @@ WORKOUT_TEMPLATES = {
                 ],
                 "accessories": [
                     {
-                        "name": "Resistance Band Chest Fly",
+                        "name": "Resistance Band Lateral Raise",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
                     {
-                        "name": "Resistance Band Bicep Curl",
+                        "name": "Band Tricep Pushdown",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
@@ -717,12 +722,12 @@ WORKOUT_TEMPLATES = {
                 ],
                 "accessories": [
                     {
-                        "name": "Resistance Band Face Pull",
+                        "name": "Resistance Band Chest Fly",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
                     {
-                        "name": "Resistance Band Hammer Curl",
+                        "name": "Band Overhead Tricep Extension",
                         "sets": 3,
                         "rep_range": "8-12",
                     },
@@ -945,9 +950,21 @@ def save_logs(logs, sha=None):
     }
     if sha:
       payload["sha"] = sha
-    res = requests.put(url, json=payload, headers=headers)
-    if res.status_code in [200, 201]:
-      st.sidebar.success("☁️ Synced to GitHub!")
+    try:
+      res = requests.put(url, json=payload, headers=headers)
+      if res.status_code in [200, 201]:
+        st.sidebar.success("☁️ Synced to GitHub!")
+      else:
+        st.sidebar.error(
+            f"⚠️ GitHub Sync Failed ({res.status_code}):"
+            f" {res.json().get('message', '')}"
+        )
+    except Exception as e:
+      st.sidebar.error(f"⚠️ GitHub Sync Exception: {e}")
+  else:
+    st.sidebar.warning(
+        "⚠️ GitHub Secrets missing. Saving locally only (will reset on update)!"
+    )
 
 
 def get_last_performance(logs_data, exercise_name):
@@ -977,69 +994,81 @@ mode = st.sidebar.radio("Environment Mode", ["Gym", "Home"])
 
 # Date-Aware Intuitive Sequence Loading (Same Calendar Day vs New Calendar Day)
 today_str = datetime.date.today().strftime("%Y-%m-%d")
-default_split_idx = 3 # Pre-default to Lower B
+default_split_idx = 3  # Pre-default to Lower B
 default_opt_idx = 0
 status_info_msg = ""
 
 if logs:
-    max_date = max(logs.keys())
-    
-    # Identify the latest split & option logged on max_date
-    latest_session_key = None
-    if logs[max_date]:
-        latest_session_key = list(logs[max_date].keys())[-1]
-    
-    last_split = None
-    last_option = None
-    if latest_session_key:
-        for s_key in SPLIT_ORDER:
-            if s_key in latest_session_key:
-                last_split = s_key
-                break
-        opt_match = re.search(r'\[(Option \d+)\]', latest_session_key)
-        if opt_match:
-            last_option = opt_match.group(1)
+  max_date = max(logs.keys())
 
-    if today_str == max_date:
-        # Same calendar day: Maintain the session logged today
-        if last_split in SPLIT_ORDER:
-            default_split_idx = SPLIT_ORDER.index(last_split)
-        avail_opts = list(WORKOUT_TEMPLATES[SPLIT_ORDER[default_split_idx]][mode].keys())
-        if last_option in avail_opts:
-            default_opt_idx = avail_opts.index(last_option)
-        status_info_msg = f"📅 Same-day view ({max_date}): Displaying today's logged session ({SPLIT_ORDER[default_split_idx].split(' ')[0]} [{avail_opts[default_opt_idx]}])."
+  # Identify the latest split & option logged on max_date
+  latest_session_key = None
+  if logs[max_date]:
+    latest_session_key = list(logs[max_date].keys())[-1]
+
+  last_split = None
+  last_option = None
+  if latest_session_key:
+    for s_key in SPLIT_ORDER:
+      if s_key in latest_session_key:
+        last_split = s_key
+        break
+    opt_match = re.search(r"\[(Option \d+)\]", latest_session_key)
+    if opt_match:
+      last_option = opt_match.group(1)
+
+  if today_str == max_date:
+    # Same calendar day: Maintain the session logged today
+    if last_split in SPLIT_ORDER:
+      default_split_idx = SPLIT_ORDER.index(last_split)
+    avail_opts = list(
+        WORKOUT_TEMPLATES[SPLIT_ORDER[default_split_idx]][mode].keys()
+    )
+    if last_option in avail_opts:
+      default_opt_idx = avail_opts.index(last_option)
+    status_info_msg = (
+        f"📅 Same-day view ({max_date}): Displaying today's logged session"
+        f" ({SPLIT_ORDER[default_split_idx].split(' ')[0]} [{avail_opts[default_opt_idx]}])."
+    )
+  else:
+    # New calendar day (at least 1 day after max_date): Advance split & option
+    if last_split in SPLIT_ORDER:
+      last_idx = SPLIT_ORDER.index(last_split)
+      default_split_idx = (last_idx + 1) % len(SPLIT_ORDER)
+
+    target_split = SPLIT_ORDER[default_split_idx]
+    avail_opts = list(WORKOUT_TEMPLATES[target_split][mode].keys())
+
+    # Look up last option used for target_split specifically
+    last_opt_for_target = None
+    for d_str in sorted(logs.keys(), reverse=True):
+      for sess_k in logs[d_str].keys():
+        if target_split in sess_k:
+          for opt in avail_opts:
+            if f"[{opt}]" in sess_k:
+              last_opt_for_target = opt
+              break
+        if last_opt_for_target:
+          break
+      if last_opt_for_target:
+        break
+
+    if last_opt_for_target in avail_opts:
+      default_opt_idx = (avail_opts.index(last_opt_for_target) + 1) % len(
+          avail_opts
+      )
     else:
-        # New calendar day (at least 1 day after max_date): Advance split & option
-        if last_split in SPLIT_ORDER:
-            last_idx = SPLIT_ORDER.index(last_split)
-            default_split_idx = (last_idx + 1) % len(SPLIT_ORDER)
-        
-        target_split = SPLIT_ORDER[default_split_idx]
-        avail_opts = list(WORKOUT_TEMPLATES[target_split][mode].keys())
-        
-        # Look up last option used for target_split specifically
-        last_opt_for_target = None
-        for d_str in sorted(logs.keys(), reverse=True):
-            for sess_k in logs[d_str].keys():
-                if target_split in sess_k:
-                    for opt in avail_opts:
-                        if f"[{opt}]" in sess_k:
-                            last_opt_for_target = opt
-                            break
-                if last_opt_for_target: break
-            if last_opt_for_target: break
-            
-        if last_opt_for_target in avail_opts:
-            default_opt_idx = (avail_opts.index(last_opt_for_target) + 1) % len(avail_opts)
-        else:
-            default_opt_idx = 0
-            
-        status_info_msg = f"🔄 Next workout prompt (Last: {max_date}): Auto-loaded {target_split.split(' ')[0]} [{avail_opts[default_opt_idx]}]."
+      default_opt_idx = 0
+
+    status_info_msg = (
+        f"🔄 Next workout prompt (Last: {max_date}): Auto-loaded"
+        f" {target_split.split(' ')[0]} [{avail_opts[default_opt_idx]}]."
+    )
 else:
-    status_info_msg = "🔄 Pre-defaulted to Lower B per routine sequence."
+  status_info_msg = "🔄 Pre-defaulted to Lower B per routine sequence."
 
 if status_info_msg:
-    st.sidebar.info(status_info_msg)
+  st.sidebar.info(status_info_msg)
 
 split_choice = st.sidebar.selectbox(
     "Select Split Day", SPLIT_ORDER, index=default_split_idx
@@ -1048,7 +1077,7 @@ split_choice = st.sidebar.selectbox(
 available_options = list(WORKOUT_TEMPLATES[split_choice][mode].keys())
 # Ensure default_opt_idx is within bounds if split_choice was manually changed
 if default_opt_idx >= len(available_options):
-    default_opt_idx = 0
+  default_opt_idx = 0
 
 option_choice = st.sidebar.radio(
     "Workout Option (Auto-Alternates)", available_options, index=default_opt_idx
@@ -1186,7 +1215,11 @@ for idx, ((lift_obj, is_comp), tab) in enumerate(zip(all_raw_lifts, tabs)):
         # Pre-default rep input to previous set's reps if available
         last_rep_val = 0
         if last_entry and isinstance(last_entry, list):
-          work_sets = [st_entry for st_entry in last_entry if st_entry.get("set") != "Warmup"]
+          work_sets = [
+              st_entry
+              for st_entry in last_entry
+              if st_entry.get("set") != "Warmup"
+          ]
           if len(work_sets) >= s:
             last_rep_val = int(work_sets[s - 1].get("reps", 0))
 
@@ -1224,7 +1257,6 @@ if st.button("💾 Save 30-Min Workout", type="primary"):
       f"{split_choice} [{option_choice}] ({phase_choice})"
   ] = session_inputs
   save_logs(logs, current_sha)
-  st.success("Session saved & auto-synced to GitHub!")
 
 # History Section
 st.markdown("---")
