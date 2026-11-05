@@ -9,19 +9,20 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-gray-900 text-gray-100 font-sans pb-20">
+<body class="bg-gray-900 text-gray-100 font-sans pb-24">
 
-  <div class="max-w-md mx-auto p-4 space-y-6">
-    <header class="text-center py-2 border-b border-gray-800">
+  <div class="max-w-md mx-auto p-4 space-y-5">
+    <!-- Header -->
+    <header class="text-center py-1 border-b border-gray-800">
       <h1 class="text-2xl font-bold text-amber-400">⚡ 30-Min Workout Tracker</h1>
       <p id="status-bar" class="text-xs text-gray-400 mt-1">Connecting to database...</p>
     </header>
 
-    <!-- Controls -->
-    <section class="bg-gray-800 p-4 rounded-xl shadow space-y-3 border border-gray-700">
+    <!-- Routine Configuration Controls -->
+    <section class="bg-gray-800 p-3.5 rounded-xl shadow space-y-3 border border-gray-700">
       <div>
-        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Split Day</label>
-        <select id="split-select" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-amber-400" onchange="renderWorkout()">
+        <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Split Day</label>
+        <select id="split-select" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-amber-400" onchange="loadWorkoutTemplate()">
           <option value="Upper A (Chest / Back / Shoulders / Arms)">Upper A (Chest / Back / Shoulders / Arms)</option>
           <option value="Lower A (Quads / Hamstrings / Glutes / Calves)">Lower A (Quads / Hamstrings / Glutes / Calves)</option>
           <option value="Upper B (Chest / Back / Shoulders / Arms)">Upper B (Chest / Back / Shoulders / Arms)</option>
@@ -29,10 +30,10 @@
         </select>
       </div>
 
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-2 gap-2">
         <div>
-          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Option</label>
-          <select id="option-select" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-amber-400" onchange="renderWorkout()">
+          <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Option</label>
+          <select id="option-select" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-amber-400" onchange="loadWorkoutTemplate()">
             <option value="Option 1">Option 1</option>
             <option value="Option 2">Option 2</option>
             <option value="Option 3">Option 3</option>
@@ -40,8 +41,8 @@
           </select>
         </div>
         <div>
-          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Environment</label>
-          <select id="env-select" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-amber-400" onchange="renderWorkout()">
+          <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Environment</label>
+          <select id="env-select" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-amber-400" onchange="loadWorkoutTemplate()">
             <option value="Gym">Gym</option>
             <option value="Home">Home</option>
           </select>
@@ -49,174 +50,38 @@
       </div>
     </section>
 
-    <!-- Workout UI Container -->
-    <main id="workout-container" class="space-y-4"></main>
+    <!-- Single Page Exercise Cards Container -->
+    <main id="workout-cards-container" class="space-y-4"></main>
+
+    <!-- Dynamic Add Exercise Section -->
+    <section class="bg-gray-800 p-4 rounded-xl border border-gray-700/80 space-y-3">
+      <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider">➕ Add Extra Exercise</h3>
+      <div class="flex gap-2">
+        <select id="custom-exercise-select" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-amber-400">
+          <option value="Cable Lateral Raise">Cable Lateral Raise</option>
+          <option value="Dumbbell Lateral Raise">Dumbbell Lateral Raise</option>
+          <option value="Cable Face Pull">Cable Face Pull</option>
+          <option value="Machine Rear Delt Fly (Reverse Pec Deck)">Machine Rear Delt Fly</option>
+          <option value="Cable Bicep Curl">Cable Bicep Curl</option>
+          <option value="Dumbbell Hammer Curl">Dumbbell Hammer Curl</option>
+          <option value="Cable Tricep Pushdown">Cable Tricep Pushdown</option>
+          <option value="Overhead Cable Tricep Extension">Overhead Cable Tricep Extension</option>
+          <option value="Heavy Cable Crunch">Heavy Cable Crunch</option>
+          <option value="Hanging Leg Raise">Hanging Leg Raise</option>
+          <option value="Seated Calf Raise (Machine)">Seated Calf Raise</option>
+          <option value="Leg Extension Machine">Leg Extension Machine</option>
+          <option value="Hip Abductor Machine">Hip Abductor Machine</option>
+        </select>
+        <button onclick="addCustomExercise()" class="bg-gray-700 hover:bg-gray-600 text-amber-400 font-bold px-4 py-2 rounded-lg text-xs border border-gray-600 whitespace-nowrap">
+          + Add
+        </button>
+      </div>
+    </section>
 
     <!-- Save Button -->
-    <button onclick="saveSession()" class="w-full bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-gray-900 font-bold py-3 rounded-xl shadow-lg transition">
+    <button onclick="saveSession()" class="w-full bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-gray-900 font-bold py-3.5 rounded-xl shadow-lg transition text-base">
       💾 Save Workout Session
     </button>
   </div>
 
   <script>
-    const SUPABASE_URL = "https://wxpgpaepvkbieryeihpb.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_SryrkBABso8FvXuL_GFweQ_quSoLeXw";
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    const WORKOUT_TEMPLATES = {
-      "Upper A (Chest / Back / Shoulders / Arms)": {
-        "Gym": {
-          "Option 1": { compounds: [{name:"Barbell Bench Press", sets:4, reps:"3-5"}, {name:"Seated Machine Row", sets:4, reps:"3-5"}], accessories: [{name:"Machine Chest Fly (Pec Deck)", sets:3, reps:"8-12"}, {name:"Cable Bicep Curl", sets:3, reps:"8-12"}] },
-          "Option 2": { compounds: [{name:"Incline Dumbbell Press", sets:4, reps:"3-5"}, {name:"Heavy Lat Pulldown", sets:4, reps:"3-5"}], accessories: [{name:"Cable Lateral Raise", sets:3, reps:"8-12"}, {name:"Incline Dumbbell Bicep Curl", sets:3, reps:"8-12"}] },
-          "Option 3": { compounds: [{name:"Plate-Loaded Machine Chest Press", sets:4, reps:"3-5"}, {name:"Single-Arm Machine Row", sets:4, reps:"3-5"}], accessories: [{name:"Machine Rear Delt Fly (Reverse Pec Deck)", sets:3, reps:"8-12"}, {name:"Dumbbell Hammer Curl", sets:3, reps:"8-12"}] },
-          "Option 4": { compounds: [{name:"Incline Machine Chest Press", sets:4, reps:"3-5"}, {name:"Seated Cable Row", sets:4, reps:"3-5"}], accessories: [{name:"Cable Chest Fly", sets:3, reps:"8-12"}, {name:"Cable Rope Hammer Curl", sets:3, reps:"8-12"}] }
-        }
-      },
-      "Lower A (Quads / Hamstrings / Glutes / Calves)": {
-        "Gym": {
-          "Option 1": { compounds: [{name:"Barbell Back Squat", sets:4, reps:"3-5"}, {name:"Romanian Deadlift (Barbell)", sets:3, reps:"5-8"}], accessories: [{name:"Leg Press Machine", sets:3, reps:"8-12"}, {name:"Hip Abductor Machine", sets:3, reps:"10-12"}] },
-          "Option 2": { compounds: [{name:"Hack Squat Machine", sets:4, reps:"3-5"}, {name:"Romanian Deadlift (Barbell)", sets:3, reps:"5-8"}], accessories: [{name:"Leg Extension Machine", sets:3, reps:"8-12"}, {name:"Standing Calf Raise (Machine)", sets:3, reps:"8-12"}] },
-          "Option 3": { compounds: [{name:"Barbell Back Squat", sets:4, reps:"3-5"}, {name:"Romanian Deadlift (Barbell)", sets:3, reps:"5-8"}], accessories: [{name:"Seated Leg Curl Machine", sets:3, reps:"8-12"}, {name:"Hip Abductor Machine", sets:3, reps:"10-12"}] },
-          "Option 4": { compounds: [{name:"Hack Squat Machine", sets:4, reps:"3-5"}, {name:"Barbell Deadlift", sets:3, reps:"3-5"}], accessories: [{name:"Lying Leg Curl Machine", sets:3, reps:"8-12"}, {name:"Seated Calf Raise (Machine)", sets:3, reps:"8-12"}] }
-        }
-      },
-      "Upper B (Chest / Back / Shoulders / Arms)": {
-        "Gym": {
-          "Option 1": { compounds: [{name:"Standing Overhead Barbell Press", sets:4, reps:"3-5"}, {name:"Seated Cable Row", sets:4, reps:"3-5"}], accessories: [{name:"Cable Chest Fly", sets:3, reps:"8-12"}, {name:"Cable Tricep Pushdown", sets:3, reps:"8-12"}] },
-          "Option 2": { compounds: [{name:"Seated DB Overhead Press", sets:4, reps:"3-5"}, {name:"Heavy Lat Pulldown", sets:4, reps:"3-5"}], accessories: [{name:"Dumbbell Lateral Raise", sets:3, reps:"8-12"}, {name:"Overhead Cable Tricep Extension", sets:3, reps:"8-12"}] },
-          "Option 3": { compounds: [{name:"Machine Shoulder Press", sets:4, reps:"3-5"}, {name:"Single-Arm Machine Row", sets:4, reps:"3-5"}], accessories: [{name:"Machine Rear Delt Fly (Reverse Pec Deck)", sets:3, reps:"8-12"}, {name:"Cable Tricep Pushdown", sets:3, reps:"8-12"}] },
-          "Option 4": { compounds: [{name:"Dumbbell Arnold Press", sets:4, reps:"3-5"}, {name:"Neutral-Grip Lat Pulldown", sets:4, reps:"3-5"}], accessories: [{name:"Cable Face Pull", sets:3, reps:"8-12"}, {name:"Overhead Cable Tricep Extension", sets:3, reps:"8-12"}] }
-        }
-      },
-      "Lower B (Quads / Hamstrings / Glutes / Core)": {
-        "Gym": {
-          "Option 1": { compounds: [{name:"Barbell Deadlift", sets:3, reps:"3-5"}, {name:"Hack Squat Machine", sets:3, reps:"5-8"}], accessories: [{name:"Hip Adductor Machine", sets:3, reps:"10-12"}, {name:"Heavy Cable Crunch", sets:3, reps:"8-12"}] },
-          "Option 2": { compounds: [{name:"Barbell Front Squat", sets:3, reps:"5-8"}, {name:"Romanian Deadlift (Barbell)", sets:3, reps:"5-8"}], accessories: [{name:"Leg Press Machine", sets:3, reps:"8-12"}, {name:"Seated Calf Raise (Machine)", sets:3, reps:"8-12"}] },
-          "Option 3": { compounds: [{name:"Barbell Deadlift", sets:3, reps:"3-5"}, {name:"Leg Press Machine", sets:3, reps:"5-8"}], accessories: [{name:"Hip Adductor Machine", sets:3, reps:"10-12"}, {name:"Seated Leg Curl Machine", sets:3, reps:"8-12"}] },
-          "Option 4": { compounds: [{name:"Barbell Front Squat", sets:3, reps:"5-8"}, {name:"Hack Squat Machine", sets:3, reps:"5-8"}], accessories: [{name:"Lying Leg Curl Machine", sets:3, reps:"8-12"}, {name:"Hanging Leg Raise", sets:3, reps:"8-12"}] }
-        }
-      }
-    };
-
-    let historyLogs = [];
-
-    async function initApp() {
-      try {
-        const { data, error } = await supabaseClient
-          .from('workout_logs')
-          .select('*')
-          .order('workout_date', { ascending: false });
-
-        if (error) throw error;
-        historyLogs = data || [];
-        document.getElementById('status-bar').innerText = `⚡ Connected | ${historyLogs.length} Sessions Logged`;
-        renderWorkout();
-      } catch (err) {
-        document.getElementById('status-bar').innerText = `⚠️ Connection Error: ${err.message}`;
-      }
-    }
-
-    function renderWorkout() {
-      const split = document.getElementById('split-select').value;
-      const option = document.getElementById('option-select').value;
-      const env = document.getElementById('env-select').value;
-
-      const template = WORKOUT_TEMPLATES[split]?.[env]?.[option] || WORKOUT_TEMPLATES[split]?.["Gym"]?.[option];
-      const container = document.getElementById('workout-container');
-      container.innerHTML = '';
-
-      if (!template) {
-        container.innerHTML = '<p class="text-red-400 text-center">Template configuration error.</p>';
-        return;
-      }
-
-      const allLifts = [...template.compounds.map(c => ({...c, isComp: true})), ...template.accessories.map(a => ({...a, isComp: false}))];
-
-      allLifts.forEach((lift, idx) => {
-        let prevRecord = "No previous history";
-        for (let entry of historyLogs) {
-          if (entry.session_data && entry.session_data[lift.name]) {
-            const sets = entry.session_data[lift.name];
-            const workSets = sets.filter(s => s.set !== 'Warmup');
-            if (workSets.length > 0) {
-              const weight = workSets[0].weight;
-              const reps = workSets.map(s => s.reps).join(', ');
-              prevRecord = `${entry.workout_date}: ${weight} lbs × [${reps}]`;
-              break;
-            }
-          }
-        }
-
-        const card = document.createElement('div');
-        card.className = "bg-gray-800 p-4 rounded-xl border border-gray-700 space-y-3";
-        card.innerHTML = `
-          <div class="flex justify-between items-center border-b border-gray-700 pb-2">
-            <div>
-              <span class="text-xs font-semibold uppercase ${lift.isComp ? 'text-amber-400' : 'text-blue-400'}">${lift.isComp ? 'Compound' : 'Accessory'}</span>
-              <h3 class="text-lg font-bold text-white">${lift.name}</h3>
-            </div>
-            <span class="text-xs text-gray-400">${lift.sets} Sets | ${lift.reps} Reps</span>
-          </div>
-          <p class="text-xs text-amber-300/80 bg-amber-900/20 p-2 rounded">📌 Prev: ${prevRecord}</p>
-
-          <div class="space-y-2">
-            <div class="flex gap-2 items-center">
-              <label class="text-xs text-gray-400 w-24">Weight (lbs):</label>
-              <input type="number" id="weight-${idx}" class="bg-gray-900 border border-gray-700 rounded p-1 text-sm w-full text-white" value="0" step="2.5">
-            </div>
-            <div class="grid grid-cols-${lift.sets} gap-2">
-              ${Array.from({length: lift.sets}).map((_, s) => `
-                <div>
-                  <label class="block text-[10px] text-gray-400 text-center">Set ${s+1}</label>
-                  <input type="number" id="rep-${idx}-${s}" class="bg-gray-900 border border-gray-700 rounded p-1 text-sm w-full text-center text-white" value="0">
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        `;
-        container.appendChild(card);
-      });
-    }
-
-    async function saveSession() {
-      const split = document.getElementById('split-select').value;
-      const option = document.getElementById('option-select').value;
-      const env = document.getElementById('env-select').value;
-      const template = WORKOUT_TEMPLATES[split]?.[env]?.[option] || WORKOUT_TEMPLATES[split]?.["Gym"]?.[option];
-
-      const allLifts = [...template.compounds.map(c => ({...c, isComp: true})), ...template.accessories.map(a => ({...a, isComp: false}))];
-      const sessionData = {};
-
-      allLifts.forEach((lift, idx) => {
-        const weight = parseFloat(document.getElementById(`weight-${idx}`).value) || 0;
-        const setsData = [];
-        for (let s = 0; s < lift.sets; s++) {
-          const reps = parseInt(document.getElementById(`rep-${idx}-${s}`).value) || 0;
-          setsData.push({ set: s + 1, weight: weight, reps: reps });
-        }
-        sessionData[lift.name] = setsData;
-      });
-
-      const today = new Date().toISOString().split('T')[0];
-
-      try {
-        const { error } = await supabaseClient.from('workout_logs').insert({
-          workout_date: today,
-          split_name: split,
-          option_name: option,
-          phase: "Phase 1",
-          session_data: sessionData
-        });
-
-        if (error) throw error;
-        alert("✅ Workout session saved to Supabase!");
-        initApp();
-      } catch (err) {
-        alert(`⚠️ Save failed: ${err.message}`);
-      }
-    }
-
-    window.onload = initApp;
-  </script>
-</body>
-</html>
