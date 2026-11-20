@@ -58,6 +58,32 @@
         💾 Save
       </button>
     </footer>
+    <details class="bg-gray-800 p-4 rounded-xl border border-gray-700">
+      <summary class="cursor-pointer font-semibold text-amber-400">AI workout coach</summary>
+      <form id="coach-form" class="mt-3 space-y-3">
+        <p class="text-xs text-gray-300">Request a review of up to 12 recent sessions. This sends exercise names, sets, reps, weights, and your goal to OpenAI.</p>
+        <label class="block text-sm">Training goal
+          <select id="coach-goal" class="block w-full mt-1 rounded bg-gray-900 p-2">
+            <option value="strength">Build strength</option>
+            <option value="muscle">Build muscle</option>
+            <option value="consistency">Build consistency</option>
+          </select>
+        </label>
+        <label class="block text-sm">How did recent sessions feel?
+          <select id="coach-effort" class="block w-full mt-1 rounded bg-gray-900 p-2">
+            <option value="unknown">Not sure</option>
+            <option value="easy">I had several reps left</option>
+            <option value="moderate">I had one or two reps left</option>
+            <option value="hard">I was at or near my limit</option>
+          </select>
+        </label>
+        <label class="block text-sm">Coach access code
+          <input id="coach-code" type="password" required class="block w-full mt-1 rounded bg-gray-900 p-2">
+        </label>
+        <button id="coach-submit" class="rounded bg-amber-400 px-3 py-2 text-sm font-semibold text-gray-900 disabled:opacity-50">Analyze recent workouts</button>
+        <p id="coach-result" role="status" class="whitespace-pre-wrap text-sm text-gray-200"></p>
+      </form>
+    </details>
   </div>
 
   <script>
@@ -528,6 +554,62 @@
         saveButton.disabled = false;
       }
     }
+
+    function coachHistory() {
+      return historyLogs.flatMap(({ session_data }) => {
+        const exercises = Object.entries(session_data ?? {}).flatMap(([name, sets]) => {
+          if (!Array.isArray(sets)) return [];
+          const workingSets = sets.filter(set => set.set !== 'Warmup' && Number(set.weight) > 0 && Number(set.reps) > 0)
+            .slice(0, 8).map(set => ({ lb: Number(set.weight), reps: Number(set.reps) }));
+          return workingSets.length ? [{ name: name.slice(0, 100), workingSets }] : [];
+        }).slice(0, 12);
+        return exercises.length ? [exercises] : [];
+      }).slice(0, 12);
+    }
+
+    document.getElementById('coach-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const button = document.getElementById('coach-submit');
+      if (button.disabled) return;
+      const result = document.getElementById('coach-result');
+      const sessions = coachHistory();
+      if (!sessions.length) {
+        result.textContent = 'Log at least one weighted working set before requesting a review.';
+        return;
+      }
+      button.disabled = true;
+      result.textContent = 'Reviewing your recent workouts…';
+      try {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/workout-coach`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_KEY,
+            'X-Coach-Code': document.getElementById('coach-code').value
+          },
+          body: JSON.stringify({
+            goal: document.getElementById('coach-goal').value,
+            effort: document.getElementById('coach-effort').value,
+            sessions
+          }),
+          signal: AbortSignal.timeout(35000)
+        });
+        if (response.status === 404 || response.status === 503) {
+          result.textContent = 'The AI coach needs to be set up in Supabase.';
+        } else if (response.status === 401) {
+          result.textContent = 'Check your coach access code and try again.';
+        } else {
+          if (!response.ok) throw new Error('Coach request failed');
+          const { advice } = await response.json();
+          if (typeof advice !== 'string' || !advice.trim()) throw new Error('Empty coach response');
+          result.textContent = advice;
+        }
+      } catch {
+        result.textContent = 'The coach could not complete the review. Try again in a moment.';
+      } finally {
+        button.disabled = false;
+      }
+    });
 
     window.onload = initApp;
   </script>
