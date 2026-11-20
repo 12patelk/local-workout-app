@@ -21,25 +21,15 @@
     <!-- Routine Configuration Controls -->
     <section class="bg-gray-800 p-3 rounded-xl shadow space-y-2 border border-gray-700">
       <div>
-        <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Split Day</label>
-        <select id="split-select" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-amber-400" onchange="loadWorkoutTemplate()">
-          <option value="Upper A (Chest / Back / Shoulders / Arms)">Upper A (Chest / Back / Shoulders / Arms)</option>
-          <option value="Lower A (Quads / Hamstrings / Glutes / Calves)">Lower A (Quads / Hamstrings / Glutes / Calves)</option>
-          <option value="Upper B (Chest / Back / Shoulders / Arms)">Upper B (Chest / Back / Shoulders / Arms)</option>
-          <option value="Lower B (Quads / Hamstrings / Glutes / Core)">Lower B (Quads / Hamstrings / Glutes / Core)</option>
-        </select>
+        <label for="workout-select" class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Workout</label>
+        <div class="flex gap-2">
+          <button type="button" aria-label="Previous workout" onclick="stepWorkout(-1)" class="bg-gray-700 rounded-lg px-3">‹</button>
+          <select id="workout-select" class="min-w-0 flex-1 bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white" onchange="loadWorkoutTemplate()"></select>
+          <button type="button" aria-label="Next workout" onclick="stepWorkout(1)" class="bg-gray-700 rounded-lg px-3">›</button>
+        </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-2">
-        <div>
-          <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Option</label>
-          <select id="option-select" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-amber-400" onchange="loadWorkoutTemplate()">
-            <option value="Option 1">Option 1</option>
-            <option value="Option 2">Option 2</option>
-            <option value="Option 3">Option 3</option>
-            <option value="Option 4">Option 4</option>
-          </select>
-        </div>
+      <div>
         <div>
           <label class="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Environment</label>
           <select id="env-select" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-amber-400" onchange="loadWorkoutTemplate()">
@@ -64,7 +54,7 @@
       <button onclick="nextExercise()" class="w-1/3 bg-gray-800 hover:bg-gray-700 text-gray-200 py-3 rounded-xl font-medium border border-gray-700 text-sm">
         Next ➔
       </button>
-      <button onclick="saveSession()" class="w-1/3 bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold py-3 rounded-xl shadow-lg text-sm">
+      <button id="save-session" onclick="saveSession()" disabled class="w-1/3 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-gray-900 font-bold py-3 rounded-xl shadow-lg text-sm">
         💾 Save
       </button>
     </footer>
@@ -165,6 +155,26 @@
     let historyLogs = [];
     let currentSessionLifts = [];
     let activeExerciseIdx = 0;
+    let saving = false;
+    const workoutSelect = document.getElementById('workout-select');
+    const environmentSelect = document.getElementById('env-select');
+    const saveButton = document.getElementById('save-session');
+    const routineDrafts = new Map();
+    const splits = Object.keys(WORKOUT_TEMPLATES);
+    const options = Object.keys(WORKOUT_TEMPLATES[splits[0]].Gym);
+    const routines = options.flatMap((_, round) => splits.map((split, splitIndex) => ({
+      split,
+      option: options[(round + splitIndex) % options.length]
+    })));
+
+    routines.forEach(({ split, option }, index) => {
+      workoutSelect.add(new Option(`${index + 1}. ${split.split(' (')[0]} · ${option}`, index));
+    });
+
+    function stepWorkout(direction) {
+      workoutSelect.selectedIndex = (workoutSelect.selectedIndex + direction + routines.length) % routines.length;
+      loadWorkoutTemplate();
+    }
 
     async function initApp() {
       try {
@@ -183,16 +193,68 @@
     }
 
     function loadWorkoutTemplate() {
-      const split = document.getElementById('split-select').value;
-      const option = document.getElementById('option-select').value;
-      const env = document.getElementById('env-select').value;
+      const { split, option } = routines[workoutSelect.selectedIndex];
+      const env = environmentSelect.value;
+      const draftKey = `${workoutSelect.value}:${env}`;
 
       const template = WORKOUT_TEMPLATES[split]?.[env]?.[option] || WORKOUT_TEMPLATES[split]?.["Gym"]?.[option];
       if (template) {
-        currentSessionLifts = JSON.parse(JSON.stringify(template.lifts));
+        if (!routineDrafts.has(draftKey)) {
+          routineDrafts.set(draftKey, template.lifts.map(lift => withHistory({ ...lift })));
+        }
+        currentSessionLifts = routineDrafts.get(draftKey);
         activeExerciseIdx = 0;
+        saveButton.disabled = saving;
         renderTabsAndScreen();
       }
+    }
+
+    function exerciseHistory(name) {
+      return historyLogs.flatMap(({ workout_date, session_data }) => {
+        const sets = session_data?.[name];
+        if (!Array.isArray(sets)) return [];
+        return [{
+          date: workout_date,
+          warmup: sets.find(set => set.set === 'Warmup' && Number(set.weight) > 0),
+          working: sets.filter(set => set.set !== 'Warmup' && Number(set.weight) > 0)
+        }];
+      });
+    }
+
+    function withHistory(lift) {
+      const history = exerciseHistory(lift.name);
+      const warmup = history.find(record => record.warmup)?.warmup;
+      const working = history.find(record => record.working.length)?.working[0];
+      return {
+        ...lift,
+        logWarmup: false,
+        wuWeight: warmup ? Number(warmup.weight) : '',
+        wuReps: Number(warmup?.reps) > 0 ? Number(warmup.reps) : '',
+        workWeight: working ? Number(working.weight) : ''
+      };
+    }
+
+    function renderProgress(progress, history, lift) {
+      const recent = history.flatMap(({ working }) => {
+        const completed = working.filter(set => Number(set.reps) > 0);
+        if (!completed.length) return [];
+        const weight = Math.max(...completed.map(set => Number(set.weight)));
+        const reps = completed.filter(set => Number(set.weight) === weight).map(set => Number(set.reps));
+        return [{ weight, reps }];
+      }).slice(0, 2);
+      if (!recent.length) {
+        progress.textContent = 'Log a weighted working set to see progress here.';
+        return;
+      }
+
+      const [latest, previous] = recent;
+      const best = ({ weight, reps }) => `${weight} lb × ${Math.max(...reps)}`;
+      const top = Number(lift.reps.match(/\d+$/)?.[0]);
+      let suggestion = 'Repeat the load and aim to add reps within your target range.';
+      if (top && latest.reps.length === lift.sets && latest.reps.every(reps => reps >= top)) {
+        suggestion = 'If all sets felt controlled, consider the smallest available weight increase.';
+      }
+      progress.textContent = `Best set last session: ${best(latest)}.${previous ? ` Prior session: ${best(previous)}.` : ''} ${suggestion}`;
     }
 
     function renderTabsAndScreen() {
@@ -237,28 +299,14 @@
     function renderActiveExerciseCard(container, lift, idx) {
       const altOptions = [lift.name, ...(EXERCISE_ALTERNATIVES[lift.name] || [])];
       
-      // Look up performance history
-      let prevRecord = "No previous records found";
-      for (let entry of historyLogs) {
-        if (entry.session_data && entry.session_data[lift.name]) {
-          const sets = entry.session_data[lift.name];
-          const wuSet = sets.find(s => s.set === 'Warmup');
-          const workSets = sets.filter(s => s.set !== 'Warmup');
-          
-          if (workSets.length > 0) {
-            const weight = workSets[0].weight;
-            const reps = workSets.map(s => s.reps).join(', ');
-            const wuInfo = wuSet ? ` | WU: ${wuSet.weight}lbs × ${wuSet.reps}` : '';
-            prevRecord = `${entry.workout_date}: ${weight} lbs × [${reps}]${wuInfo}`;
-            break;
-          }
-        }
-      }
+      const history = exerciseHistory(lift.name);
+      const lastWorking = history.find(record => record.working.length);
+      const lastWarmup = lift.isComp ? history.find(record => record.warmup) : undefined;
 
       const card = document.createElement('div');
       card.className = "bg-gray-800 p-4 rounded-xl border border-gray-700 space-y-4 shadow-xl";
       card.innerHTML = `
-        <div class="flex justify-between items-start border-b border-gray-700 pb-2">
+        <div data-exercise-heading class="flex justify-between items-start border-b border-gray-700 pb-2 touch-pan-y">
           <div>
             <span class="text-[10px] font-bold uppercase tracking-wider ${lift.isComp ? 'text-amber-400' : 'text-blue-400'}">
               ${lift.isComp ? '🔥 Compound Lift' : '⚡ Accessory Lift'}
@@ -280,7 +328,12 @@
 
         <!-- History Banner -->
         <div class="bg-gray-900/80 p-2.5 rounded-lg border border-gray-700/60 text-xs text-amber-300/90">
-          📌 <strong>Previous History:</strong> ${prevRecord}
+          <strong>Last logged weights</strong>
+          <p data-history></p>
+        </div>
+        <div class="bg-gray-900/80 p-2.5 rounded-lg border border-gray-700/60 text-xs text-gray-300">
+          <strong>Progress</strong>
+          <p data-progress></p>
         </div>
 
         <!-- Warmup Set Block (Compounds Only) -->
@@ -290,13 +343,17 @@
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[10px] text-gray-400">Warmup Weight (lbs)</label>
-                <input type="number" id="wu-weight-${idx}" placeholder="e.g. 95" value="${lift.wuWeight || ''}" onchange="lift.wuWeight=this.value" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-400">
+                <input type="number" id="wu-weight-${idx}" placeholder="e.g. 95" value="${lift.wuWeight}" oninput="editWarmup(${idx}, 'wuWeight', this.value)" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-400">
               </div>
               <div>
                 <label class="block text-[10px] text-gray-400">Warmup Reps</label>
-                <input type="number" id="wu-reps-${idx}" placeholder="e.g. 8" value="${lift.wuReps || ''}" onchange="lift.wuReps=this.value" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-400">
+                <input type="number" id="wu-reps-${idx}" placeholder="e.g. 8" value="${lift.wuReps}" oninput="editWarmup(${idx}, 'wuReps', this.value)" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:outline-none focus:border-amber-400">
               </div>
             </div>
+            <label class="flex items-center gap-2 text-xs text-gray-300">
+              <input type="checkbox" id="log-warmup-${idx}" ${lift.logWarmup ? 'checked' : ''} onchange="currentSessionLifts[${idx}].logWarmup = this.checked">
+              Log this warm-up
+            </label>
           </div>
         ` : ''}
 
@@ -304,19 +361,40 @@
         <div class="space-y-3">
           <div>
             <label class="block text-xs font-semibold text-gray-300">Working Weight (lbs) for all ${lift.sets} sets:</label>
-            <input type="number" id="working-weight-${idx}" step="2.5" placeholder="Weight in lbs" value="${lift.workWeight || ''}" onchange="lift.workWeight=this.value" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white mt-1 focus:outline-none focus:border-amber-400">
+            <input type="number" id="working-weight-${idx}" step="2.5" placeholder="Weight in lbs (0 for bodyweight)" value="${lift.workWeight}" oninput="currentSessionLifts[${idx}].workWeight = this.value" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white mt-1 focus:outline-none focus:border-amber-400">
           </div>
 
           <div class="grid grid-cols-${lift.sets} gap-2">
             ${Array.from({length: lift.sets}).map((_, s) => `
               <div>
                 <label class="block text-[10px] text-gray-400 text-center mb-1">Set ${s+1}</label>
-                <input type="number" id="set-${idx}-${s}" placeholder="Reps" value="${(lift.savedSets && lift.savedSets[s]) || ''}" onchange="saveSetRep(${idx}, ${s}, this.value)" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-center text-white focus:outline-none focus:border-amber-400">
+                <input type="number" id="set-${idx}-${s}" placeholder="Reps" value="${lift.savedSets?.[s] ?? ''}" oninput="saveSetRep(${idx}, ${s}, this.value)" class="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-center text-white focus:outline-none focus:border-amber-400">
               </div>
             `).join('')}
           </div>
         </div>
       `;
+      const historyText = [];
+      if (lastWorking) historyText.push(`${lastWorking.date} · Working: ${lastWorking.working[0].weight} lb`);
+      if (lastWarmup) historyText.push(`${lastWarmup.date} · Warm-up: ${lastWarmup.warmup.weight} lb`);
+      card.querySelector('[data-history]').textContent = historyText.join(' / ') || 'No nonzero weights logged yet.';
+      renderProgress(card.querySelector('[data-progress]'), history, lift);
+
+      const heading = card.querySelector('[data-exercise-heading]');
+      let touchStart;
+      heading.addEventListener('touchstart', event => {
+        touchStart = event.touches.length === 1 ? event.touches[0] : null;
+      }, { passive: true });
+      heading.addEventListener('touchend', event => {
+        if (!touchStart) return;
+        const touch = event.changedTouches[0];
+        const distance = touch.clientX - touchStart.clientX;
+        const vertical = touch.clientY - touchStart.clientY;
+        touchStart = null;
+        if (Math.abs(distance) < 45 || Math.abs(distance) <= Math.abs(vertical)) return;
+        if (distance < 0) nextExercise();
+        else prevExercise();
+      }, { passive: true });
       container.appendChild(card);
     }
 
@@ -342,7 +420,10 @@
     }
 
     function swapEquipment(idx, newName) {
-      currentSessionLifts[idx].name = newName;
+      const lift = currentSessionLifts[idx];
+      if (lift.name === newName) return;
+      const originalName = lift.originalName ?? lift.name;
+      currentSessionLifts[idx] = withHistory({ ...lift, originalName, name: newName, savedSets: undefined });
       renderTabsAndScreen();
     }
 
@@ -351,14 +432,21 @@
       currentSessionLifts[liftIdx].savedSets[setIdx] = val;
     }
 
+    function editWarmup(idx, field, value) {
+      const lift = currentSessionLifts[idx];
+      lift[field] = value;
+      lift.logWarmup = Number(lift.wuReps) > 0 && lift.wuWeight !== '';
+      document.getElementById(`log-warmup-${idx}`).checked = lift.logWarmup;
+    }
+
     function addCustomExercise() {
       const selectedName = document.getElementById('custom-exercise-select').value;
-      currentSessionLifts.push({
+      currentSessionLifts.push(withHistory({
         name: selectedName,
         sets: 3,
         reps: "8-12",
         isComp: false
-      });
+      }));
       activeExerciseIdx = currentSessionLifts.length - 1;
       renderTabsAndScreen();
     }
@@ -378,39 +466,66 @@
     }
 
     async function saveSession() {
-      const split = document.getElementById('split-select').value;
-      const option = document.getElementById('option-select').value;
-      const sessionData = {};
+      if (saving) return;
+      const { split, option } = routines[workoutSelect.selectedIndex];
+      const draftKey = `${workoutSelect.value}:${environmentSelect.value}`;
+      const draft = currentSessionLifts;
+      const draftSnapshot = JSON.stringify(draft);
+      const sessionData = Object.create(null);
 
-      currentSessionLifts.forEach((lift, idx) => {
+      for (const lift of draft) {
         const setsData = [];
-        if (lift.isComp && lift.wuWeight) {
-          setsData.push({ set: "Warmup", weight: parseFloat(lift.wuWeight) || 0, reps: parseInt(lift.wuReps) || 0 });
+        if (lift.isComp && lift.logWarmup) {
+          if (lift.wuWeight === '' || Number(lift.wuWeight) < 0 || !(Number(lift.wuReps) > 0)) {
+            alert(`Enter a warm-up weight (0 for bodyweight) and positive reps for ${lift.name}.`);
+            return;
+          }
+          setsData.push({ set: 'Warmup', weight: Number(lift.wuWeight), reps: Number(lift.wuReps) });
         }
-        const workW = parseFloat(lift.workWeight) || 0;
         for (let s = 0; s < lift.sets; s++) {
-          const repVal = (lift.savedSets && parseInt(lift.savedSets[s])) || 0;
-          setsData.push({ set: s + 1, weight: workW, reps: repVal });
+          const reps = Number(lift.savedSets?.[s]);
+          if (!(reps > 0)) continue;
+          if (lift.workWeight === '' || Number(lift.workWeight) < 0) {
+            alert(`Enter a working weight for ${lift.name} (0 for bodyweight).`);
+            return;
+          }
+          setsData.push({ set: s + 1, weight: Number(lift.workWeight), reps });
         }
-        sessionData[lift.name] = setsData;
-      });
+        if (setsData.length) (sessionData[lift.name] ??= []).push(...setsData);
+      }
+      if (!Object.keys(sessionData).length) {
+        alert('Enter reps for at least one completed set.');
+        return;
+      }
 
-      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const today = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+        .map(part => String(part).padStart(2, '0')).join('-');
+      const entry = {
+        workout_date: today,
+        split_name: split,
+        option_name: option,
+        phase: 'Phase 1',
+        session_data: sessionData
+      };
 
+      saving = true;
+      saveButton.disabled = true;
       try {
-        const { error } = await supabaseClient.from('workout_logs').insert({
-          workout_date: today,
-          split_name: split,
-          option_name: option,
-          phase: "Phase 1",
-          session_data: sessionData
-        });
-
+        const { error } = await supabaseClient.from('workout_logs').insert(entry);
         if (error) throw error;
+        historyLogs.unshift(entry);
+        document.getElementById('status-bar').innerText = `⚡ Connected | ${historyLogs.length} Sessions Logged`;
+        if (JSON.stringify(draft) === draftSnapshot) {
+          routineDrafts.delete(draftKey);
+          if (currentSessionLifts === draft) loadWorkoutTemplate();
+        }
         alert("✅ Workout session saved to Supabase!");
-        initApp();
       } catch (err) {
         alert(`⚠️ Save failed: ${err.message}`);
+      } finally {
+        saving = false;
+        saveButton.disabled = false;
       }
     }
 
