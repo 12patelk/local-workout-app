@@ -116,7 +116,17 @@
       "Leg Extension Machine", "Hip Abductor Machine"
     ];
 
-    // Paced/Interleaved Workout Templates (Push -> Pull -> Isolation -> Antagonist)
+    function lowerDay(primary, secondary, isolation, accessory, core) {
+      return { lifts: [
+        { name: primary, sets: 3, reps: '3-5', isComp: true },
+        { name: secondary, sets: 2, reps: '6-10', isComp: true },
+        { name: isolation, sets: 2, reps: '10-15', isComp: false },
+        { name: accessory, sets: 2, reps: '10-15', isComp: false },
+        { name: core, sets: 2, reps: '8-12', isComp: false }
+      ] };
+    }
+
+    // Keep split keys compatible with previously saved sessions.
     const WORKOUT_TEMPLATES = {
       "Upper A (Chest / Back / Shoulders / Arms)": {
         "Gym": {
@@ -128,10 +138,10 @@
       },
       "Lower A (Quads / Hamstrings / Glutes / Calves)": {
         "Gym": {
-          "Option 1": { lifts: [{name:"Barbell Back Squat", sets:4, reps:"3-5", isComp:true}, {name:"Romanian Deadlift (Barbell)", sets:3, reps:"5-8", isComp:true}, {name:"Leg Press Machine", sets:3, reps:"8-12", isComp:false}, {name:"Hip Abductor Machine", sets:3, reps:"10-12", isComp:false}] },
-          "Option 2": { lifts: [{name:"Hack Squat Machine", sets:4, reps:"3-5", isComp:true}, {name:"Romanian Deadlift (Barbell)", sets:3, reps:"5-8", isComp:true}, {name:"Leg Extension Machine", sets:3, reps:"8-12", isComp:false}, {name:"Standing Calf Raise (Machine)", sets:3, reps:"8-12", isComp:false}] },
-          "Option 3": { lifts: [{name:"Barbell Back Squat", sets:4, reps:"3-5", isComp:true}, {name:"Romanian Deadlift (Barbell)", sets:3, reps:"5-8", isComp:true}, {name:"Seated Leg Curl Machine", sets:3, reps:"8-12", isComp:false}, {name:"Hip Abductor Machine", sets:3, reps:"10-12", isComp:false}] },
-          "Option 4": { lifts: [{name:"Hack Squat Machine", sets:4, reps:"3-5", isComp:true}, {name:"Barbell Deadlift", sets:3, reps:"3-5", isComp:true}, {name:"Lying Leg Curl Machine", sets:3, reps:"8-12", isComp:false}, {name:"Seated Calf Raise (Machine)", sets:3, reps:"8-12", isComp:false}] }
+          "Option 1": lowerDay("Barbell Back Squat", "Romanian Deadlift (Barbell)", "Seated Leg Curl Machine", "Standing Calf Raise (Machine)", "Heavy Cable Crunch"),
+          "Option 2": lowerDay("Hack Squat Machine", "Romanian Deadlift (Barbell)", "Lying Leg Curl Machine", "Seated Calf Raise (Machine)", "Hanging Leg Raise"),
+          "Option 3": lowerDay("Barbell Back Squat", "Romanian Deadlift (Barbell)", "Seated Leg Curl Machine", "Seated Calf Raise (Machine)", "Heavy Cable Crunch"),
+          "Option 4": lowerDay("Hack Squat Machine", "Romanian Deadlift (Barbell)", "Lying Leg Curl Machine", "Standing Calf Raise (Machine)", "Hanging Leg Raise")
         }
       },
       "Upper B (Chest / Back / Shoulders / Arms)": {
@@ -144,10 +154,10 @@
       },
       "Lower B (Quads / Hamstrings / Glutes / Core)": {
         "Gym": {
-          "Option 1": { lifts: [{name:"Barbell Deadlift", sets:3, reps:"3-5", isComp:true}, {name:"Hack Squat Machine", sets:3, reps:"5-8", isComp:true}, {name:"Hip Adductor Machine", sets:3, reps:"10-12", isComp:false}, {name:"Heavy Cable Crunch", sets:3, reps:"8-12", isComp:false}] },
-          "Option 2": { lifts: [{name:"Barbell Front Squat", sets:3, reps:"5-8", isComp:true}, {name:"Romanian Deadlift (Barbell)", sets:3, reps:"5-8", isComp:true}, {name:"Leg Press Machine", sets:3, reps:"8-12", isComp:false}, {name:"Seated Calf Raise (Machine)", sets:3, reps:"8-12", isComp:false}] },
-          "Option 3": { lifts: [{name:"Barbell Deadlift", sets:3, reps:"3-5", isComp:true}, {name:"Leg Press Machine", sets:3, reps:"5-8", isComp:true}, {name:"Hip Adductor Machine", sets:3, reps:"10-12", isComp:false}, {name:"Seated Leg Curl Machine", sets:3, reps:"8-12", isComp:false}] },
-          "Option 4": { lifts: [{name:"Barbell Front Squat", sets:3, reps:"5-8", isComp:true}, {name:"Hack Squat Machine", sets:3, reps:"5-8", isComp:true}, {name:"Lying Leg Curl Machine", sets:3, reps:"8-12", isComp:false}, {name:"Hanging Leg Raise", sets:3, reps:"8-12", isComp:false}] }
+          "Option 1": lowerDay("Barbell Deadlift", "Hack Squat Machine", "Leg Extension Machine", "Hip Adductor Machine", "Hanging Leg Raise"),
+          "Option 2": lowerDay("Barbell Deadlift", "Barbell Front Squat", "Leg Extension Machine", "Hip Abductor Machine", "Heavy Cable Crunch"),
+          "Option 3": lowerDay("Barbell Deadlift", "Leg Press Machine", "Leg Extension Machine", "Hip Adductor Machine", "Hanging Leg Raise"),
+          "Option 4": lowerDay("Barbell Deadlift", "Leg Press Machine", "Leg Extension Machine", "Hip Abductor Machine", "Heavy Cable Crunch")
         }
       }
     };
@@ -162,13 +172,10 @@
     const routineDrafts = new Map();
     const splits = Object.keys(WORKOUT_TEMPLATES);
     const options = Object.keys(WORKOUT_TEMPLATES[splits[0]].Gym);
-    const routines = options.flatMap((_, round) => splits.map((split, splitIndex) => ({
-      split,
-      option: options[(round + splitIndex) % options.length]
-    })));
+    const routines = options.flatMap(option => splits.map(split => ({ split, option })));
 
     routines.forEach(({ split, option }, index) => {
-      workoutSelect.add(new Option(`${index + 1}. ${split.split(' (')[0]} · ${option}`, index));
+      workoutSelect.add(new Option(`${index + 1}. ${option} · ${split.split(' (')[0]}`, index));
     });
 
     function stepWorkout(direction) {
@@ -209,10 +216,22 @@
       }
     }
 
-    function exerciseHistory(name) {
+    function exerciseId(name) {
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      // Keep historical IDs for alternate names of the same movement and equipment.
+      switch (slug) {
+        case 'seated-db-overhead-press': return 'seated-dumbbell-overhead-press';
+        case 'machine-rear-delt-fly': return 'machine-rear-delt-fly-reverse-pec-deck';
+        default: return slug;
+      }
+    }
+
+    function exerciseHistory(id) {
       return historyLogs.flatMap(({ workout_date, session_data }) => {
-        const sets = session_data?.[name];
-        if (!Array.isArray(sets)) return [];
+        const sets = Object.entries(session_data ?? {}).flatMap(([name, loggedSets]) =>
+          Array.isArray(loggedSets) ? loggedSets.filter(set => (set.exercise_id ?? exerciseId(name)) === id) : []
+        );
+        if (!sets.length) return [];
         return [{
           date: workout_date,
           warmup: sets.find(set => set.set === 'Warmup' && Number(set.weight) > 0),
@@ -222,11 +241,13 @@
     }
 
     function withHistory(lift) {
-      const history = exerciseHistory(lift.name);
+      const id = exerciseId(lift.name);
+      const history = exerciseHistory(id);
       const warmup = history.find(record => record.warmup)?.warmup;
       const working = history.find(record => record.working.length)?.working[0];
       return {
         ...lift,
+        id,
         logWarmup: false,
         wuWeight: warmup ? Number(warmup.weight) : '',
         wuReps: Number(warmup?.reps) > 0 ? Number(warmup.reps) : '',
@@ -299,7 +320,7 @@
     function renderActiveExerciseCard(container, lift, idx) {
       const altOptions = [lift.name, ...(EXERCISE_ALTERNATIVES[lift.name] || [])];
       
-      const history = exerciseHistory(lift.name);
+      const history = exerciseHistory(lift.id);
       const lastWorking = history.find(record => record.working.length);
       const lastWarmup = lift.isComp ? history.find(record => record.warmup) : undefined;
 
@@ -480,7 +501,7 @@
             alert(`Enter a warm-up weight (0 for bodyweight) and positive reps for ${lift.name}.`);
             return;
           }
-          setsData.push({ set: 'Warmup', weight: Number(lift.wuWeight), reps: Number(lift.wuReps) });
+          setsData.push({ exercise_id: lift.id, set: 'Warmup', weight: Number(lift.wuWeight), reps: Number(lift.wuReps) });
         }
         for (let s = 0; s < lift.sets; s++) {
           const reps = Number(lift.savedSets?.[s]);
@@ -489,7 +510,7 @@
             alert(`Enter a working weight for ${lift.name} (0 for bodyweight).`);
             return;
           }
-          setsData.push({ set: s + 1, weight: Number(lift.workWeight), reps });
+          setsData.push({ exercise_id: lift.id, set: s + 1, weight: Number(lift.workWeight), reps });
         }
         if (setsData.length) (sessionData[lift.name] ??= []).push(...setsData);
       }
